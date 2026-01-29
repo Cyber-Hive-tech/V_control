@@ -4,8 +4,7 @@
   "description": "Elite Cyber Surveillance & Remote Control Command Center",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
